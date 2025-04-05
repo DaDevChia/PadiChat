@@ -1,0 +1,17 @@
+openai 
+langgraph 
+langchain 
+langchain_openai 
+python-telegram-bot[job-queue] 
+fastapi 
+uvicorn 
+python-dotenv 
+requests 
+chromadb-client 
+tiktoken 
+openai 
+tavily-python 
+beautifulsoup4 
+pypdf 
+lxml
+telegramify_markdown
