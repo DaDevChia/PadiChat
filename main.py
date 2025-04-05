@@ -8,7 +8,7 @@ from telegram.ext import Application, MessageHandler, filters, PicklePersistence
 
 # Import handlers and profile functions
 from user_profile import load_user_profiles, save_user_profiles # Need save for shutdown
-from handlers import onboarding_conversation, handle_message, error_handler, settings_conversation
+from handlers import onboarding_conversation, handle_message, error_handler, settings_conversation, handle_photo
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -55,6 +55,7 @@ def main() -> None:
     # --- Register Handlers ---
     application.add_handler(onboarding_conversation)
     application.add_handler(settings_conversation) # <-- Add the settings conversation
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo)) # <-- Add photo handler
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_error_handler(error_handler)
 
