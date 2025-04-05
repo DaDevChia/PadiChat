@@ -3,15 +3,11 @@ import json
 import logging
 import os
 from typing import Dict, Any, Optional
-from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+PROFILE_FILE = "user_profiles.json"
 
-# --- Constants ---
-load_dotenv()
-PROFILE_FILE = os.getenv("PROFILE_FILE")
-
-# --- Profile Functions ---
+# load_user_profiles, save_user_profiles, get_user_profile, update_user_profile remain the same
 
 def load_user_profiles() -> Dict[int, Dict[str, Any]]:
     """Loads user profiles from the JSON file."""
@@ -20,7 +16,6 @@ def load_user_profiles() -> Dict[int, Dict[str, Any]]:
         return {}
     try:
         with open(PROFILE_FILE, 'r', encoding='utf-8') as f:
-            # Ensure keys are integers after loading from JSON
             data = json.load(f)
             return {int(k): v for k, v in data.items()}
     except json.JSONDecodeError:
@@ -35,7 +30,6 @@ def save_user_profiles(profiles: Dict[int, Dict[str, Any]]) -> None:
     try:
         with open(PROFILE_FILE, 'w', encoding='utf-8') as f:
             json.dump(profiles, f, ensure_ascii=False, indent=4)
-        # logger.info(f"User profiles saved to '{PROFILE_FILE}'.") # Log sparingly maybe
     except Exception as e:
         logger.error(f"Failed to save profiles to '{PROFILE_FILE}': {e}", exc_info=True)
 
@@ -49,11 +43,13 @@ def update_user_profile(user_id: int, profiles: Dict[int, Dict[str, Any]], **kwa
         profiles[user_id] = {}
     profiles[user_id].update(kwargs)
     logger.info(f"Updated profile for user {user_id}. New data: {kwargs}")
-    # Save immediately after update for persistence
-    save_user_profiles(profiles)
+    save_user_profiles(profiles) # Save immediately
 
+
+# --- MODIFIED is_onboarding_complete ---
 def is_onboarding_complete(user_id: int, profiles: Dict[int, Dict[str, Any]]) -> bool:
-    """Checks if essential onboarding information (e.g., language, region) exists."""
+    """Checks if essential onboarding information (language, country, state/province) exists."""
     profile = profiles.get(user_id, {})
-    # Define what constitutes "complete" onboarding for now
-    return "language" in profile and "region" in profile
+    # Define what constitutes "complete" onboarding
+    required_fields = ["language", "country", "state_province"]
+    return all(field in profile and profile[field] for field in required_fields)
