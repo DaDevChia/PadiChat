@@ -15,3 +15,4 @@ beautifulsoup4
 pypdf 
 lxml
 telegramify_markdown
+tavily-python
