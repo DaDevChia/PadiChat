@@ -27,14 +27,22 @@ logger = logging.getLogger(__name__)
 
 # Constants
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
-# --- MODIFIED System Prompt Template to mention images ---
+
 SYSTEM_PROMPT_TEMPLATE = (
     "You are AgriSight Bot, a helpful AI assistant for Southeast Asian farmers. "
     "The user is located in {state_province}, {country}. Their preferred language is {language_name}. "
-    "You can analyze images of crops to identify potential diseases. If an image is provided, focus your response on analyzing it. " # <-- Added image capability info
+    "You can analyze images of crops to identify potential diseases. If an image is provided, focus your response on analyzing it. "
     "You MUST respond ONLY in {language_name}. Do not use any other language. "
     "Keep answers concise (2-4 paragraphs) unless asked for more detail. "
-    "Use Markdown: **bold**, *italic*, `code`, [links](https://example.com), bullet points (* item)."
+    "Use Markdown: **bold**, *italic*, `code`, [links](https://example.com), bullet points (* item).\n\n" # Added newline for clarity
+    # --- NEW Citation Instruction ---
+    "IMPORTANT: When you use information obtained from the web_search tool, you MUST cite your sources. "
+    "Do this by embedding Markdown links directly into your sentences. "
+    "For example, if the search result provides information about rice, you might say: "
+    "'Recent reports indicate that [global rice production is expected to increase](https://example.com/rice-report) this year.' "
+    "Use the specific URL provided for the relevant search result from the tool's output. "
+    "Do NOT list sources separately at the end or use footnote-style citations like [1]."
+    "Integrate the information and the links naturally."
 )
 
 LANG_CODE_TO_NAME = {"en": "English", "id": "Bahasa Indonesia", "vi": "Vietnamese", "th": "Thai", "tl": "Tagalog"}
@@ -66,6 +74,8 @@ async def send_long_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, te
             start = split_pos
             if start < len(converted_text) and converted_text[start] == '\n': start += 1
             await asyncio.sleep(0.5)
+
+
 
 def get_language_keyboard(callback_prefix: str = "lang_") -> InlineKeyboardMarkup:
     # ... (implementation remains the same) ...
@@ -138,7 +148,6 @@ async def settings_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     logger.info(f"User {update.effective_user.id} cancelled settings."); return ConversationHandler.END
 
 
-# --- NEW: Refactored Agent Invocation Logic ---
 async def _invoke_agent_and_respond(
     context: ContextTypes.DEFAULT_TYPE,
     user_id: int,
@@ -150,41 +159,69 @@ async def _invoke_agent_and_respond(
     """Loads history, adds new message/image, invokes agent, saves history, sends response."""
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
-    # Construct Dynamic System Prompt
+    # --- Construct Dynamic System Prompt using the NEW template ---
     user_lang_code = user_profile.get('language', 'en')
     user_lang_name = LANG_CODE_TO_NAME.get(user_lang_code, 'English')
     user_country = user_profile.get('country', 'Southeast Asia')
     user_state = user_profile.get('state_province', 'unspecified region')
-    dynamic_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-        state_province=user_state, country=user_country, language_name=user_lang_name
-    )
-    logger.debug(f"Using dynamic system prompt for user {user_id}: {dynamic_system_prompt}")
+    try:
+        dynamic_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            state_province=user_state, country=user_country, language_name=user_lang_name
+        )
+        logger.debug(f"Using dynamic system prompt for user {user_id}:\n{dynamic_system_prompt}") # Log the full prompt
+    except KeyError as e:
+        logger.error(f"Failed to format system prompt template. Missing key: {e}", exc_info=True)
+        # Fallback to a generic prompt if formatting fails
+        dynamic_system_prompt = f"You are a helpful AI assistant. Please respond in {user_lang_name}."
 
-    # History loading/reconstruction
+    # --- History loading/reconstruction (ensure system prompt is updated/added) ---
     history_key = "chat_history_dicts"
     current_history_objects: List[BaseMessage] = []
-    # ... (History loading logic including checking/adding system prompt) ...
+    system_prompt_in_history = False
     if history_key in context.user_data:
-        system_prompt_found_and_updated = False
-        for msg_dict in context.user_data[history_key]:
+        logger.debug(f"Loading history for user {user_id} from user_data.")
+        for i, msg_dict in enumerate(context.user_data[history_key]):
             role = msg_dict.get("role"); content = msg_dict.get("content", "")
-            if role == "system": current_history_objects.append(SystemMessage(content=dynamic_system_prompt)); system_prompt_found_and_updated = True
+            # Update the first message if it's system, otherwise insert at beginning
+            if i == 0 and role == "system":
+                logger.debug("Updating existing system prompt in history.")
+                current_history_objects.append(SystemMessage(content=dynamic_system_prompt))
+                system_prompt_in_history = True
             elif role == "user": current_history_objects.append(HumanMessage(content=content))
             elif role == "assistant": current_history_objects.append(AIMessage(content=content, tool_calls=msg_dict.get("tool_calls", [])))
             elif role == "tool":
                  tool_call_id = msg_dict.get("tool_call_id"); name = msg_dict.get("name")
                  if tool_call_id: current_history_objects.append(ToolMessage(content=content, tool_call_id=tool_call_id, name=name))
                  else: logger.warning(f"Skipping ToolMessage dict missing tool_call_id: {msg_dict}")
+            elif role == "system": # Handle potential older system prompts not at index 0
+                 logger.warning("Found system prompt not at index 0, skipping.")
+                 pass # Skip older system prompts if not the first message
             else: logger.warning(f"Skipping history item with unknown role: {msg_dict}")
-        if not system_prompt_found_and_updated: current_history_objects.insert(0, SystemMessage(content=dynamic_system_prompt)); logger.info(f"Prepended dynamic system prompt for {user_id}")
-    else: current_history_objects.append(SystemMessage(content=dynamic_system_prompt)); logger.info(f"Initialized history for {user_id} with dynamic prompt.")
 
-    # Append the new human message (text and/or reference to image)
-    current_history_objects.append(HumanMessage(content=user_message_text or "Please analyze the image provided.")) # Use text or default prompt
+        if not system_prompt_in_history:
+            logger.debug("Prepending new system prompt to history.")
+            current_history_objects.insert(0, SystemMessage(content=dynamic_system_prompt))
+            system_prompt_in_history = True
+    else:
+        logger.debug(f"Initializing history for {user_id} with new system prompt.")
+        current_history_objects.append(SystemMessage(content=dynamic_system_prompt))
+        system_prompt_in_history = True
 
-    # Limit history length
-    max_history_len = 10
+    # Append the new human message
+    new_human_message_content = user_message_text or ("Please analyze the image provided." if image_bytes else "...")
+    if new_human_message_content != "...": # Avoid adding placeholder if no text/image
+        current_history_objects.append(HumanMessage(content=new_human_message_content))
+    elif not current_history_objects: # Should not happen if system prompt is always added
+        logger.error("Attempted to invoke agent with no messages.")
+        await context.bot.send_message(chat_id=chat_id, text="Internal error: Cannot process empty request.")
+        return
+
+
+    # Limit history length (keeping system prompt)
+    max_history_len = 10 # Adjust as needed (consider token limits)
     if len(current_history_objects) > max_history_len:
+         logger.debug(f"History length {len(current_history_objects)} exceeds max {max_history_len}. Trimming.")
+         # Keep system prompt + last max_history_len-1 messages
          current_history_objects = current_history_objects[:1] + current_history_objects[-max_history_len+1:]
 
     # Encode image if provided
@@ -195,33 +232,57 @@ async def _invoke_agent_and_respond(
         messages=current_history_objects,
         user_id=user_id,
         user_profile=user_profile,
-        image_base64=image_b64 # Pass image data
+        image_base64=image_b64
     )
 
     # Agent invocation
     response_text = None
     try:
-        # KEEP TOOLS DISABLED IN agent.py for now
+        logger.info(f"Invoking agent for user {user_id}...")
         final_state = await agent_executor.ainvoke(agent_input_state)
         final_messages: List[BaseMessage] = final_state.get('messages', [])
+
         if final_messages:
              last_ai_message = final_messages[-1]
-             if isinstance(last_ai_message, AIMessage): response_text = last_ai_message.content
-             else: response_text = "Unexpected response."; logger.warning(f"Agent ended non-AIMessage: {last_ai_message}")
-             # Save history back (IMPORTANT: Ensure system prompt is saved)
-             context.user_data[history_key] = [
-                 {"role": "system", "content": msg.content} if isinstance(msg, SystemMessage) else
-                 {"role": "user", "content": msg.content} if isinstance(msg, HumanMessage) else
-                 {"role": "assistant", "content": msg.content, "tool_calls": msg.tool_calls} if isinstance(msg, AIMessage) else
-                 {"role": "tool", "content": msg.content, "tool_call_id": msg.tool_call_id, "name": msg.name} if isinstance(msg, ToolMessage) else {}
-                 for msg in final_messages ]
-             context.user_data[history_key] = [d for d in context.user_data[history_key] if d]
-        else: response_text = "Couldn't get response."; logger.error(f"Agent returned empty state for {user_id}")
-    except Exception as e: logger.error(f"Error invoking agent for {user_id}: {e}", exc_info=True); response_text = f"Critical error ({type(e).__name__})."
+             if isinstance(last_ai_message, AIMessage):
+                 response_text = last_ai_message.content
+                 logger.debug(f"Agent response received (AIMessage): Content length {len(response_text or '')}, Tool calls: {len(last_ai_message.tool_calls or [])}")
+             else:
+                 response_text = "Unexpected response format received from agent."
+                 logger.warning(f"Agent execution finished, but last message was not AIMessage: {type(last_ai_message)}")
 
-    await send_long_message(context, chat_id, response_text)
+             # --- Save history back ---
+             # Ensure the system prompt saved is the *latest* one used
+             history_to_save = []
+             system_prompt_saved = False
+             for msg in final_messages:
+                 msg_dict = {}
+                 if isinstance(msg, SystemMessage):
+                     if not system_prompt_saved: # Save only the first (latest) system prompt
+                          msg_dict = {"role": "system", "content": msg.content}
+                          system_prompt_saved = True
+                     else: continue # Skip older system prompts if somehow present
+                 elif isinstance(msg, HumanMessage): msg_dict = {"role": "user", "content": msg.content}
+                 elif isinstance(msg, AIMessage): msg_dict = {"role": "assistant", "content": msg.content, "tool_calls": msg.tool_calls}
+                 elif isinstance(msg, ToolMessage): msg_dict = {"role": "tool", "content": msg.content, "tool_call_id": msg.tool_call_id, "name": msg.name}
 
+                 if msg_dict: # Add if valid dict created
+                    history_to_save.append(msg_dict)
 
+             context.user_data[history_key] = history_to_save
+             logger.debug(f"Saved {len(history_to_save)} messages to history for user {user_id}.")
+
+        else:
+            response_text = "Sorry, I couldn't generate a response for that."
+            logger.error(f"Agent returned empty final state messages for user {user_id}")
+
+    except Exception as e:
+        logger.error(f"Error invoking agent or processing response for user {user_id}: {e}", exc_info=True)
+        response_text = f"Sorry, a critical error occurred ({type(e).__name__}). Please try again later."
+
+    # Send final response
+    await send_long_message(context, chat_id, response_text or "...")
+  
 # --- MODIFIED Regular Message Handler ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles regular text messages using the refactored agent invocation."""
