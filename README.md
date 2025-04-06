@@ -1,6 +1,6 @@
-# AgriSight Bot: AI Farming Assistant for Telegram
+# PadiChat: AI Farming Assistant for Telegram
 
-AgriSight Bot is an intelligent Telegram bot designed to assist Southeast Asian farmers. It leverages AI language models (specifically configured for Nebius AI Studio) and agentic workflows (using LangGraph) to provide conversational support, analyze crop images for potential diseases (initial implementation), and offer personalized information based on user location and language preferences.
+PadiChat is an intelligent Telegram bot designed to assist Southeast Asian farmers. It leverages AI language models (specifically configured for Nebius AI Studio) and agentic workflows (using LangGraph) to provide conversational support, analyze crop images for potential diseases (initial implementation), and offer personalized information based on user location and language preferences.
 
 ## Key Features
 
