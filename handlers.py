@@ -2,8 +2,8 @@
 import logging
 import asyncio
 from typing import Optional, List
-import base64 # Import standard library
-import io # Import for handling byte streams
+import base64
+import io
 
 import telegramify_markdown
 from telegramify_markdown import customize
@@ -25,7 +25,6 @@ from agent import agent_executor, AgentState # AgentState needed for type hint
 
 logger = logging.getLogger(__name__)
 
-# Constants
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
 
 SYSTEM_PROMPT_TEMPLATE = (
@@ -55,7 +54,6 @@ def get_profiles(context: ContextTypes.DEFAULT_TYPE) -> dict:
 
 async def send_long_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str):
     """Converts LLM Markdown and sends, splitting if needed."""
-    # ... (implementation remains the same) ...
     if not text: logger.warning(f"Attempted to send empty message to chat {chat_id}"); await context.bot.send_message(chat_id=chat_id, text="..."); return
     logger.debug("Original text from LLM:\n%s", text)
     try: converted_text = telegramify_markdown.markdownify(text); logger.debug("Converted text:\n%s", converted_text)
@@ -75,20 +73,16 @@ async def send_long_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, te
             if start < len(converted_text) and converted_text[start] == '\n': start += 1
             await asyncio.sleep(0.5)
 
-
-
 def get_language_keyboard(callback_prefix: str = "lang_") -> InlineKeyboardMarkup:
-    # ... (implementation remains the same) ...
     keyboard = [[InlineKeyboardButton("English 🇬🇧", callback_data=f'{callback_prefix}en')], [InlineKeyboardButton("Bahasa Indonesia 🇮🇩", callback_data=f'{callback_prefix}id')], [InlineKeyboardButton("Tiếng Việt 🇻🇳", callback_data=f'{callback_prefix}vi')], [InlineKeyboardButton("ภาษาไทย 🇹🇭", callback_data=f'{callback_prefix}th')], [InlineKeyboardButton("Tagalog 🇵🇭", callback_data=f'{callback_prefix}tl')], [InlineKeyboardButton("Other", callback_data=f'{callback_prefix}other')]]; return InlineKeyboardMarkup(keyboard)
+
 def get_country_keyboard(callback_prefix: str = "country_") -> InlineKeyboardMarkup:
-    # ... (implementation remains the same) ...
     countries = [("Indonesia 🇮🇩", "ID"), ("Malaysia 🇲🇾", "MY"), ("Philippines 🇵🇭", "PH"), ("Singapore 🇸🇬", "SG"), ("Thailand 🇹🇭", "TH"), ("Vietnam 🇻🇳", "VN"), ("Other", "OTHER")]; keyboard = []; row = [];
     for name, code in countries: row.append(InlineKeyboardButton(name, callback_data=f'{callback_prefix}{code}'));
     if len(row) == 2: keyboard.append(row); row = []
     if row: keyboard.append(row); return InlineKeyboardMarkup(keyboard)
 
-# --- Onboarding Handlers (remain the same) ---
-# ... (start, onboard_ask_language_callback, onboard_ask_country_callback, onboard_ask_state_province, onboard_cancel) ...
+# --- Onboarding Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int | None:
     user = update.effective_user; chat_id = update.effective_chat.id; user_id = user.id; profiles = get_profiles(context)
     if user_id not in profiles: update_user_profile(user_id, profiles, name=user.first_name)
@@ -111,8 +105,7 @@ async def onboard_ask_state_province(update: Update, context: ContextTypes.DEFAU
 async def onboard_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
      logger.info(f"User {update.effective_user.id} cancelled onboarding."); await context.bot.send_message(chat_id=update.effective_chat.id, text="Onboarding cancelled. /start to try again."); return ConversationHandler.END
 
-# --- Settings Handlers (remain the same) ---
-# ... (settings_start, settings_select_action_callback, settings_receive_language_callback, settings_receive_country_callback, settings_receive_state, settings_cancel) ...
+# --- Settings Handlers ---
 async def settings_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user=update.effective_user; profiles=get_profiles(context)
     if not is_onboarding_complete(user.id, profiles): await update.message.reply_text("Complete setup via /start first."); return ConversationHandler.END
@@ -159,7 +152,7 @@ async def _invoke_agent_and_respond(
     """Loads history, adds new message/image, invokes agent, saves history, sends response."""
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
-    # --- Construct Dynamic System Prompt using the NEW template ---
+    # --- Construct Dynamic System Prompt ---
     user_lang_code = user_profile.get('language', 'en')
     user_lang_name = LANG_CODE_TO_NAME.get(user_lang_code, 'English')
     user_country = user_profile.get('country', 'Southeast Asia')
@@ -283,7 +276,7 @@ async def _invoke_agent_and_respond(
     # Send final response
     await send_long_message(context, chat_id, response_text or "...")
   
-# --- MODIFIED Regular Message Handler ---
+# --- Regular Message Handler ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles regular text messages using the refactored agent invocation."""
     user = update.effective_user; chat_id = update.effective_chat.id; user_id = user.id
@@ -363,10 +356,9 @@ onboarding_conversation = ConversationHandler(
     },
     fallbacks=[CommandHandler('cancel', onboard_cancel)],
     name="onboarding_flow", # Give names for potential persistence differentiation
-    # persistent=True, # Optional persistence for onboarding state
 )
 
-# --- NEW Settings Conversation Handler Definition ---
+# --- Settings Conversation Handler Definition ---
 settings_conversation = ConversationHandler(
     entry_points=[CommandHandler('settings', settings_start)],
     states={
@@ -377,5 +369,4 @@ settings_conversation = ConversationHandler(
     },
     fallbacks=[CommandHandler('cancel', settings_cancel), CallbackQueryHandler(settings_cancel, pattern='^setting_cancel$')],
      name="settings_flow",
-     # persistent=True, # Optional
 )

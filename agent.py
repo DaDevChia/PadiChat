@@ -17,7 +17,7 @@ from tools import available_tools_definitions, tool_executor_map
 
 logger = logging.getLogger(__name__)
 
-# --- Agent State Definition (remains the same) ---
+# --- Agent State Definition ---
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     user_id: int
@@ -25,8 +25,7 @@ class AgentState(TypedDict):
     image_base64: Optional[str]
 
 # --- Agent Nodes ---
-
-# --- MODIFIED call_llm to select model and enable/disable tools ---
+# --- call_llm to select model and enable/disable tools ---
 async def call_llm(state: AgentState) -> Dict[str, Any]:
     """
     Calls the appropriate Nebius LLM (Text/Tool or Vision) based on input
@@ -50,7 +49,7 @@ async def call_llm(state: AgentState) -> Dict[str, Any]:
 
     logger.info(f"Calling LLM for user {state['user_id']} with {len(messages)} messages.")
 
-    # --- Message Formatting Logic (remains the same) ---
+    # --- Message Formatting Logic ---
     # This logic correctly formats messages with or without images,
     # and with or without tool calls/results in history.
     formatted_messages = []
@@ -82,7 +81,7 @@ async def call_llm(state: AgentState) -> Dict[str, Any]:
              formatted_messages.append({"role": "system", "content": msg.content or ""})
         else: logger.warning(f"Unexpected message type during formatting: {type(msg)}")
 
-    # --- Image Attachment Logic (remains the same, applies ONLY if image_data_b64 is present) ---
+    # --- Image Attachment Logic (applies ONLY if image_data_b64 is present) ---
     if image_data_b64 and last_human_message_index != -1:
         logger.debug("Attaching image data to the last user message for VISION model.")
         last_msg = formatted_messages[last_human_message_index]
@@ -160,10 +159,9 @@ async def call_llm(state: AgentState) -> Dict[str, Any]:
         return {"messages": [error_message]}
 
 
-# --- execute_tools (remains the same) ---
+# --- execute_tools ---
 # This node is only reached if call_llm (using Llama) returns tool calls.
 async def execute_tools(state: AgentState) -> Dict[str, List[ToolMessage]]:
-    # ... (no changes needed in the implementation of execute_tools itself) ...
     messages = state['messages']
     last_message = messages[-1]
 
@@ -212,12 +210,8 @@ async def execute_tools(state: AgentState) -> Dict[str, List[ToolMessage]]:
 
     return {"messages": tool_messages}
 
-
-# --- should_continue (remains the same) ---
-# This logic correctly routes based on whether the *last* message (which
-# would be from Llama if tools were possible) contains tool calls.
+# This logic correctly routes based on whether the *last* message (which would be from Llama if tools were possible) contains tool calls.
 def should_continue(state: AgentState) -> Literal["execute_tools", "__end__"]:
-    # ... (no changes needed) ...
     last_message = state['messages'][-1]
     if isinstance(last_message, AIMessage) and last_message.tool_calls:
         if any(tc.get("id") for tc in last_message.tool_calls):
@@ -231,9 +225,8 @@ def should_continue(state: AgentState) -> Literal["execute_tools", "__end__"]:
         return "__end__"
 
 
-# --- build_agent_graph (remains the same) ---
+# --- build_agent_graph ---
 def build_agent_graph():
-    # ... (no changes needed) ...
     graph = StateGraph(AgentState)
     graph.add_node("call_llm", call_llm)
     graph.add_node("execute_tools", execute_tools)

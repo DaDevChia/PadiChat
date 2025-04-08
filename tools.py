@@ -8,7 +8,6 @@ from tavily import TavilyClient
 
 logger = logging.getLogger(__name__)
 
-# --- Schemas remain the same ---
 class GetCurrentWeatherParams(BaseModel):
     location: str = Field(..., description="The city and state/country, e.g., 'San Francisco, CA' or 'Jakarta, Indonesia'")
     unit: Literal['celsius', 'fahrenheit'] = Field("celsius", description="The temperature unit (default: celsius)")
@@ -16,7 +15,6 @@ class GetCurrentWeatherParams(BaseModel):
 class WebSearchParams(BaseModel):
     query: str = Field(..., description="The search query to look up on the web.")
 
-# --- Tool Definitions List remains the same ---
 available_tools_definitions = [
     {
         "type": "function",
@@ -36,9 +34,7 @@ available_tools_definitions = [
     }
 ]
 
-# --- get_current_weather remains the same ---
 def get_current_weather(location: str, unit: str = "celsius") -> str:
-    # ... (implementation) ...
     logger.info(f"Simulating tool call: get_current_weather(location='{location}', unit='{unit}')")
     if "jakarta" in location.lower(): temp = 30 if unit == "celsius" else 86; condition = "Hot and humid"
     elif "dallas" in location.lower(): temp = 85 if unit == "fahrenheit" else 29; condition = "Partly cloudy"
@@ -46,7 +42,6 @@ def get_current_weather(location: str, unit: str = "celsius") -> str:
     return json.dumps({"location": location, "temperature": temp, "unit": unit, "condition": condition, "forecast": "Stable for the next few hours."})
 
 
-# --- MODIFIED Web Search Tool Implementation ---
 async def web_search(query: str) -> str:
     """
     Performs a web search using the Tavily API and returns a structured
@@ -67,7 +62,6 @@ async def web_search(query: str) -> str:
             include_answer=True,  # Request the summarized answer
             include_raw_content=False, # Don't need raw HTML
             max_results=5 # Limit results
-            # include_images=False # Not needed for text citations
         )
 
         logger.debug(f"Tavily raw response dict: {response_dict}")
@@ -117,7 +111,6 @@ async def web_search(query: str) -> str:
         return json.dumps({"query": query, "error": f"Search failed: {type(e).__name__} - {e}"})
 
 
-# --- Mapping remains the same ---
 tool_executor_map = {
     "get_current_weather": get_current_weather,
     "web_search": web_search,

@@ -7,8 +7,6 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger(__name__)
 PROFILE_FILE = "user_profiles.json"
 
-# load_user_profiles, save_user_profiles, get_user_profile, update_user_profile remain the same
-
 def load_user_profiles() -> Dict[int, Dict[str, Any]]:
     """Loads user profiles from the JSON file."""
     if not os.path.exists(PROFILE_FILE):
@@ -45,8 +43,6 @@ def update_user_profile(user_id: int, profiles: Dict[int, Dict[str, Any]], **kwa
     logger.info(f"Updated profile for user {user_id}. New data: {kwargs}")
     save_user_profiles(profiles) # Save immediately
 
-
-# --- MODIFIED is_onboarding_complete ---
 def is_onboarding_complete(user_id: int, profiles: Dict[int, Dict[str, Any]]) -> bool:
     """Checks if essential onboarding information (language, country, state/province) exists."""
     profile = profiles.get(user_id, {})

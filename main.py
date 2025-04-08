@@ -3,10 +3,8 @@ import logging
 import os
 from dotenv import load_dotenv
 
-# Persistence needed for user_data if bot restarts
 from telegram.ext import Application, MessageHandler, filters, PicklePersistence
 
-# Import handlers and profile functions
 from user_profile import load_user_profiles, save_user_profiles # Need save for shutdown
 from handlers import onboarding_conversation, handle_message, error_handler, settings_conversation, handle_photo
 
@@ -63,7 +61,7 @@ def main() -> None:
     logger.info("Starting bot polling...")
     application.run_polling()
 
-    # --- Save Profiles on Shutdown (Optional but good practice) ---
+    # --- Save Profiles on Shutdown ---
     # Polling runs indefinitely, this might not be hit easily unless stopped gracefully.
     # Persistence handles saving, but manual save can be a backup.
     logger.info("Attempting to save profiles on shutdown...")
