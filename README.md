@@ -1,4 +1,5 @@
 # PadiChat: AI Farming Assistant for Telegram
+<img src="https://github.com/user-attachments/assets/fd502c19-a9be-4515-b162-57a6b5d46398" width="150" height="150">
 
 PadiChat is an intelligent Telegram bot designed to assist Southeast Asian farmers. It leverages AI language models (specifically configured for Nebius AI Studio) and agentic workflows (using LangGraph) to provide conversational support, analyze crop images for potential diseases (initial implementation), and offer personalized information based on user location and language preferences.
 
@@ -64,8 +65,8 @@ PadiChat is an intelligent Telegram bot designed to assist Southeast Asian farme
 
 2.  **Clone the Repository:**
     ```bash
-    git clone <your-repository-url>
-    cd <repository-directory>
+    git clone https://github.com/DaDevChia/PadiChat
+    cd PadiChat
     ```
 
 3.  **Create a Virtual Environment (Recommended):**
